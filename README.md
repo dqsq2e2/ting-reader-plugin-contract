@@ -23,7 +23,7 @@ runtime-specific SDKs.
 The Ting Reader backend pins a released tag:
 
 ```toml
-ting-plugin-contract = { git = "https://github.com/dqsq2e2/ting-reader-plugin-contract.git", tag = "v2.0.0" }
+ting-plugin-contract = { git = "https://github.com/dqsq2e2/ting-reader-plugin-contract.git", tag = "v2.0.1" }
 ```
 
 Plugin SDKs and plugins use the same dependency, so the host and extensions
@@ -41,8 +41,10 @@ through an SDK; its parser and format-specific metadata stay outside the core.
 ## Versioning
 
 `v2.0.0` is the first externally published contract for the standardized
-plugin foundation. The `MIN_PLUGIN_CORE_VERSION` constant is the minimum core
-release that accepts this contract.
+plugin foundation. `v2.0.1` lowers the verified minimum Rust version to 1.93
+without changing the protocol or the required Ting Reader core version.
+The `MIN_PLUGIN_CORE_VERSION` constant is the minimum core release that
+accepts this contract.
 
 ## License
 

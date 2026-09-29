@@ -1,8 +1,8 @@
 [package]
 name = "ting-plugin-contract"
-version = "2.0.0"
+version = "2.0.1"
 edition = "2024"
-rust-version = "1.98"
+rust-version = "1.93"
 license = "AGPL-3.0-only"
 description = "Shared Ting Reader plugin operation and data contracts"
 

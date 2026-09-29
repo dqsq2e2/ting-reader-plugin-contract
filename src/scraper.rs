@@ -78,13 +78,12 @@ impl SearchRequest {
         {
             return Err("Chapter candidates exceed bounds");
         }
-        if let Some(context) = &self.context {
-            if context.candidates.len() > 100
+        if self.context.as_ref().is_some_and(|context| {
+            context.candidates.len() > 100
                 || context.scraper_query.as_ref().is_some_and(|text| text.len() > 512)
                 || serde_json::to_vec(context).is_ok_and(|bytes| bytes.len() > 128 * 1024)
-            {
-                return Err("Search context exceeds bounds");
-            }
+        }) {
+            return Err("Search context exceeds bounds");
         }
         Ok(())
     }
