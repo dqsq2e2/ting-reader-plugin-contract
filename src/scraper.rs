@@ -60,27 +60,32 @@ impl SearchRequest {
         if self.page == 0 || !(1..=100).contains(&self.page_size) {
             return Err("Search page and page_size must be within bounds");
         }
-        if [&self.title, &self.author, &self.narrator].into_iter()
-            .flatten().any(|text| text.len() > 512)
+        if [&self.title, &self.author, &self.narrator]
+            .into_iter()
+            .flatten()
+            .any(|text| text.len() > 512)
         {
             return Err("Search field exceeds 512 bytes");
         }
-        if serde_json::to_vec(&self.filters)
-            .is_ok_and(|bytes| bytes.len() > 8 * 1024)
-        {
+        if serde_json::to_vec(&self.filters).is_ok_and(|bytes| bytes.len() > 8 * 1024) {
             return Err("Search filters exceed 8 KiB");
         }
         if self.chapter_candidates.len() > 500
             || self.chapter_candidates.iter().any(|chapter| {
-                chapter.id.trim().is_empty() || chapter.id.len() > 512
-                    || chapter.title.trim().is_empty() || chapter.title.len() > 512
+                chapter.id.trim().is_empty()
+                    || chapter.id.len() > 512
+                    || chapter.title.trim().is_empty()
+                    || chapter.title.len() > 512
             })
         {
             return Err("Chapter candidates exceed bounds");
         }
         if self.context.as_ref().is_some_and(|context| {
             context.candidates.len() > 100
-                || context.scraper_query.as_ref().is_some_and(|text| text.len() > 512)
+                || context
+                    .scraper_query
+                    .as_ref()
+                    .is_some_and(|text| text.len() > 512)
                 || serde_json::to_vec(context).is_ok_and(|bytes| bytes.len() > 128 * 1024)
         }) {
             return Err("Search context exceeds bounds");
@@ -103,7 +108,8 @@ pub struct SearchPage {
 
 impl SearchPage {
     pub fn validate(&self) -> Result<(), &'static str> {
-        if self.page == 0 || !(1..=100).contains(&self.page_size)
+        if self.page == 0
+            || !(1..=100).contains(&self.page_size)
             || self.items.len() > self.page_size as usize
             || self.items.len() > 100
         {
@@ -168,27 +174,43 @@ impl ScraperResult {
             return Err("Result title must be nonempty and within 512 bytes");
         }
         if self.id.as_ref().is_some_and(|id| id.trim().is_empty())
-            || self.source_url.as_ref().is_some_and(|url| url.trim().is_empty())
+            || self
+                .source_url
+                .as_ref()
+                .is_some_and(|url| url.trim().is_empty())
         {
             return Err("Empty source references must use null");
         }
-        if self.score.is_some_and(|score| !score.is_finite() || !(0.0..=1.0).contains(&score)) {
+        if self
+            .score
+            .is_some_and(|score| !score.is_finite() || !(0.0..=1.0).contains(&score))
+        {
             return Err("Match score must be finite and between zero and one");
         }
         if self.tags.len() > 64
-            || self.tags.iter().any(|tag| tag.trim().is_empty() || tag.len() > 256)
+            || self
+                .tags
+                .iter()
+                .any(|tag| tag.trim().is_empty() || tag.len() > 256)
         {
             return Err("Result tags exceed bounds");
         }
-        if self.chapter_titles.len() > 500 || self.chapter_titles.iter()
-            .any(|title| title.trim().is_empty() || title.len() > 512)
+        if self.chapter_titles.len() > 500
+            || self
+                .chapter_titles
+                .iter()
+                .any(|title| title.trim().is_empty() || title.len() > 512)
         {
             return Err("Chapter titles exceed bounds");
         }
         if self.published_date.as_ref().is_some_and(|date| {
-            date.len() != 10 || date.as_bytes().get(4) != Some(&b'-')
+            date.len() != 10
+                || date.as_bytes().get(4) != Some(&b'-')
                 || date.as_bytes().get(7) != Some(&b'-')
-                || !date.bytes().enumerate().all(|(i, byte)| i == 4 || i == 7 || byte.is_ascii_digit())
+                || !date
+                    .bytes()
+                    .enumerate()
+                    .all(|(i, byte)| i == 4 || i == 7 || byte.is_ascii_digit())
         }) {
             return Err("Published date must use YYYY-MM-DD");
         }
@@ -270,12 +292,18 @@ pub struct ChapterItem {
 
 impl ChapterItem {
     pub fn validate(&self) -> Result<(), &'static str> {
-        if self.id.trim().is_empty() || self.id.len() > 512
-            || self.title.trim().is_empty() || self.title.len() > 512
+        if self.id.trim().is_empty()
+            || self.id.len() > 512
+            || self.title.trim().is_empty()
+            || self.title.len() > 512
         {
             return Err("Chapter ID and title must be nonempty and within 512 bytes");
         }
-        if self.source_url.as_ref().is_some_and(|url| url.trim().is_empty()) {
+        if self
+            .source_url
+            .as_ref()
+            .is_some_and(|url| url.trim().is_empty())
+        {
             return Err("Empty chapter URL must use null");
         }
         Ok(())
@@ -296,7 +324,8 @@ pub struct ChapterPage {
 
 impl ChapterPage {
     pub fn validate(&self) -> Result<(), &'static str> {
-        if self.page == 0 || !(1..=100).contains(&self.page_size)
+        if self.page == 0
+            || !(1..=100).contains(&self.page_size)
             || self.items.len() > self.page_size as usize
         {
             return Err("Chapter page exceeds declared bounds");
@@ -319,7 +348,11 @@ pub struct ChapterDetail {
 impl ChapterDetail {
     pub fn validate(&self) -> Result<(), &'static str> {
         self.chapter.validate()?;
-        if self.description.as_ref().is_some_and(|text| text.len() > 32 * 1024) {
+        if self
+            .description
+            .as_ref()
+            .is_some_and(|text| text.len() > 32 * 1024)
+        {
             return Err("Chapter description exceeds 32 KiB");
         }
         Ok(())
@@ -351,7 +384,8 @@ pub struct MediaSourceDescriptor {
 impl MediaSourceDescriptor {
     pub fn validate(&self) -> Result<(), &'static str> {
         if self.url.len() > 8192
-            || !(self.url.starts_with("https://") || self.url.starts_with("http://")
+            || !(self.url.starts_with("https://")
+                || self.url.starts_with("http://")
                 || self.url.starts_with('/'))
         {
             return Err("Media source must be an HTTP URL or a Host route");
@@ -380,9 +414,12 @@ pub struct CoverAssetRef {
 
 impl CoverAssetRef {
     pub fn validate(&self) -> Result<(), &'static str> {
-        if self.resource.trim().is_empty() || self.resource.len() > 256
-            || self.mime_type.trim().is_empty() || self.mime_type.len() > 256
-            || self.length == 0 || self.length > 20 * 1024 * 1024
+        if self.resource.trim().is_empty()
+            || self.resource.len() > 256
+            || self.mime_type.trim().is_empty()
+            || self.mime_type.len() > 256
+            || self.length == 0
+            || self.length > 20 * 1024 * 1024
         {
             return Err("Cover must be a bounded Host resource");
         }
@@ -399,12 +436,24 @@ mod tests {
         let item = serde_json::json!({"id": null, "title": "Book"});
         assert!(serde_json::from_value::<ScraperResult>(item).is_err());
         let request = SearchRequest {
-            title: Some("Book".into()), author: None, narrator: None,
-            page: 1, page_size: 20, filters: Default::default(),
-            chapter_candidates: Vec::new(), context: None,
+            title: Some("Book".into()),
+            author: None,
+            narrator: None,
+            page: 1,
+            page_size: 20,
+            filters: Default::default(),
+            chapter_candidates: Vec::new(),
+            context: None,
         };
         assert!(request.validate().is_ok());
-        assert!(SearchRequest { page_size: 0, ..request }.validate().is_err());
+        assert!(
+            SearchRequest {
+                page_size: 0,
+                ..request
+            }
+            .validate()
+            .is_err()
+        );
     }
 
     #[test]
@@ -417,19 +466,39 @@ mod tests {
             "items": [chapter], "page": 1, "page_size": 20,
             "total": null, "has_more": null
         });
-        assert!(serde_json::from_value::<ChapterPage>(page.clone()).unwrap().validate().is_ok());
+        assert!(
+            serde_json::from_value::<ChapterPage>(page.clone())
+                .unwrap()
+                .validate()
+                .is_ok()
+        );
         let mut old = page;
         old["items"][0]["book_id"] = serde_json::json!("undeclared");
         assert!(serde_json::from_value::<ChapterPage>(old).is_err());
-        assert!(serde_json::from_value::<CoverAssetRef>(serde_json::json!({
-            "resource": "host:cover", "mime_type": "image/jpeg", "length": 1
-        })).unwrap().validate().is_ok());
-        assert!(serde_json::from_value::<CoverAssetRef>(serde_json::json!({
-            "resource": "host:cover", "mime_type": "image/jpeg", "length": 0
-        })).unwrap().validate().is_err());
-        assert!(serde_json::from_value::<MediaSourceDescriptor>(serde_json::json!({
-            "type": "direct", "url": "file:///secret", "expires_at": null,
-            "mime": null, "seekable": true
-        })).unwrap().validate().is_err());
+        assert!(
+            serde_json::from_value::<CoverAssetRef>(serde_json::json!({
+                "resource": "host:cover", "mime_type": "image/jpeg", "length": 1
+            }))
+            .unwrap()
+            .validate()
+            .is_ok()
+        );
+        assert!(
+            serde_json::from_value::<CoverAssetRef>(serde_json::json!({
+                "resource": "host:cover", "mime_type": "image/jpeg", "length": 0
+            }))
+            .unwrap()
+            .validate()
+            .is_err()
+        );
+        assert!(
+            serde_json::from_value::<MediaSourceDescriptor>(serde_json::json!({
+                "type": "direct", "url": "file:///secret", "expires_at": null,
+                "mime": null, "seekable": true
+            }))
+            .unwrap()
+            .validate()
+            .is_err()
+        );
     }
 }

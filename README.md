@@ -27,7 +27,7 @@ Rust 插件在 `Cargo.toml` 中引用：
 
 ```toml
 [dependencies]
-ting-plugin-sdk = { git = "https://github.com/dqsq2e2/ting-plugin-sdk.git", tag = "v2.0.1" }
+ting-plugin-sdk = { git = "https://github.com/dqsq2e2/ting-plugin-sdk.git", tag = "v2.0.2" }
 ```
 
 在插件的 `src/lib.rs` 中导入：
@@ -60,7 +60,7 @@ JavaScript 插件使用项目根目录的 `sdk.mjs`，按能力文档中的输�
 
 ```toml
 [dependencies]
-ting-plugin-contract = { git = "https://github.com/dqsq2e2/ting-reader-plugin-contract.git", tag = "v2.0.1" }
+ting-plugin-contract = { git = "https://github.com/dqsq2e2/ting-reader-plugin-contract.git", tag = "v2.0.2" }
 serde_json = "1"
 ```
 

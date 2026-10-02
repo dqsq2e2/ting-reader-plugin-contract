@@ -64,10 +64,18 @@ pub struct Dependency {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Permission {
-    NetworkAccess { domain: String },
-    FileRead { path: String },
-    FileWrite { path: String },
-    EventSubscribe { event: String },
+    NetworkAccess {
+        domain: String,
+    },
+    FileRead {
+        path: String,
+    },
+    FileWrite {
+        path: String,
+    },
+    EventSubscribe {
+        event: String,
+    },
     BooksRead,
     BooksWrite,
     LibrariesRead,
@@ -194,9 +202,7 @@ impl<'de> Deserialize<'de> for Permission {
                 .as_ref()
                 .and_then(Value::as_str)
                 .filter(|value| !value.trim().is_empty())
-                .ok_or_else(|| {
-                    D::Error::custom("capability_invoke.capability_id is required")
-                })?;
+                .ok_or_else(|| D::Error::custom("capability_invoke.capability_id is required"))?;
             if present.len() != 2 {
                 return Err(D::Error::custom(
                     "capability_invoke requires plugin_id and capability_id only",
@@ -374,21 +380,18 @@ impl PluginManifest {
                     require(
                         !plugin_id.is_empty()
                             && plugin_id.len() <= 64
-                            && plugin_id
-                                .bytes()
-                                .all(|byte| {
-                                    byte.is_ascii_lowercase()
-                                        || byte.is_ascii_digit()
-                                        || matches!(byte, b'-' | b'_' | b'.' | b'@')
-                                }),
+                            && plugin_id.bytes().all(|byte| {
+                                byte.is_ascii_lowercase()
+                                    || byte.is_ascii_digit()
+                                    || matches!(byte, b'-' | b'_' | b'.' | b'@')
+                            }),
                         "capability_invoke.plugin_id must be a safe plugin instance ID",
                     )?;
                     require(
                         !capability_id.is_empty()
                             && capability_id.len() <= 128
                             && capability_id.bytes().all(|byte| {
-                                byte.is_ascii_alphanumeric()
-                                    || matches!(byte, b'-' | b'_' | b'.')
+                                byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')
                             }),
                         "capability_invoke.capability_id must be a safe capability ID",
                     )?;

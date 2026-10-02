@@ -323,23 +323,41 @@ impl Capability {
                         localized(placeholder, "search_fields.placeholder")?;
                     }
                 }
-                let custom_fields: Vec<&str> = cap.search_fields.iter()
+                let custom_fields: Vec<&str> = cap
+                    .search_fields
+                    .iter()
                     .map(|field| field.key.as_str())
                     .filter(|key| !matches!(*key, "title" | "author" | "narrator"))
                     .collect();
                 if let Some(schema) = &cap.filters_schema {
                     validate_schema(schema)?;
-                    require(schema.get("type").and_then(Value::as_str) == Some("object"),
-                        "filters_schema must describe an object")?;
-                    let properties = schema.get("properties").and_then(Value::as_object)
-                        .ok_or_else(|| InvalidCapability("filters_schema needs properties".into()))?;
-                    require(properties.keys().all(|key| custom_fields.contains(&key.as_str())),
-                        "filters_schema properties must be declared search fields")?;
-                    require(custom_fields.iter().all(|key| properties.contains_key(*key)),
-                        "custom search fields must have a filters_schema property")?;
+                    require(
+                        schema.get("type").and_then(Value::as_str) == Some("object"),
+                        "filters_schema must describe an object",
+                    )?;
+                    let properties = schema
+                        .get("properties")
+                        .and_then(Value::as_object)
+                        .ok_or_else(|| {
+                            InvalidCapability("filters_schema needs properties".into())
+                        })?;
+                    require(
+                        properties
+                            .keys()
+                            .all(|key| custom_fields.contains(&key.as_str())),
+                        "filters_schema properties must be declared search fields",
+                    )?;
+                    require(
+                        custom_fields
+                            .iter()
+                            .all(|key| properties.contains_key(*key)),
+                        "custom search fields must have a filters_schema property",
+                    )?;
                 } else {
-                    require(custom_fields.is_empty(),
-                        "custom search fields require filters_schema")?;
+                    require(
+                        custom_fields.is_empty(),
+                        "custom search fields require filters_schema",
+                    )?;
                 }
                 if cap.auto_scrape {
                     require(
