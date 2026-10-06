@@ -93,6 +93,8 @@ pub enum Permission {
     PlaylistsWrite,
     FavoritesRead,
     FavoritesWrite,
+    BookmarksRead,
+    BookmarksWrite,
     UserSettingsRead,
     UserSettingsWrite,
     ConfigRead,
@@ -177,6 +179,8 @@ impl<'de> Deserialize<'de> for Permission {
             | "playlists_write"
             | "favorites_read"
             | "favorites_write"
+            | "bookmarks_read"
+            | "bookmarks_write"
             | "user_settings_read"
             | "user_settings_write"
             | "config_read"
@@ -250,6 +254,8 @@ impl<'de> Deserialize<'de> for Permission {
             "playlists_write" => Self::PlaylistsWrite,
             "favorites_read" => Self::FavoritesRead,
             "favorites_write" => Self::FavoritesWrite,
+            "bookmarks_read" => Self::BookmarksRead,
+            "bookmarks_write" => Self::BookmarksWrite,
             "user_settings_read" => Self::UserSettingsRead,
             "user_settings_write" => Self::UserSettingsWrite,
             "config_read" => Self::ConfigRead,
@@ -501,6 +507,34 @@ mod tests {
         manifest.permissions.pop();
         manifest.config_schema = Some(json!({"$ref":"https://example.org/schema.json"}));
         assert!(manifest.validate().is_err());
+    }
+
+    #[test]
+    fn bookmark_permissions_round_trip_without_user_supplied_scope() {
+        for (kind, expected) in [
+            ("bookmarks_read", Permission::BookmarksRead),
+            ("bookmarks_write", Permission::BookmarksWrite),
+        ] {
+            let value = json!({"type": kind});
+            let permission: Permission = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(permission, expected);
+            assert_eq!(serde_json::to_value(permission).unwrap(), value);
+
+            let mut manifest = valid();
+            manifest["permissions"] = json!([value]);
+            serde_json::from_value::<PluginManifest>(manifest)
+                .unwrap()
+                .validate()
+                .unwrap();
+            for field in ["user_id", "domain", "path"] {
+                assert!(
+                    serde_json::from_value::<Permission>(json!({
+                        "type": kind, field: "other-user",
+                    }))
+                    .is_err()
+                );
+            }
+        }
     }
 
     #[test]
