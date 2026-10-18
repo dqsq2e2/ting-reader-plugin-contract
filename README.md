@@ -60,7 +60,7 @@ JavaScript 插件使用项目根目录的 `sdk.mjs`，按能力文档中的输�
 
 ```toml
 [dependencies]
-ting-plugin-contract = { git = "https://github.com/dqsq2e2/ting-reader-plugin-contract.git", tag = "v2.0.2" }
+ting-plugin-contract = { git = "https://github.com/dqsq2e2/ting-reader-plugin-contract.git", tag = "v2.0.3" }
 serde_json = "1"
 ```
 
@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## 版本与构建
 
-- 当前 crate 版本为 `2.0.1`，发布 tag 为 `v2.0.1`。
+- 当前 crate 版本为 `2.0.3`，发布 tag 为 `v2.0.3`。
 - 使用 Rust 2024 edition，最低 Rust 版本为 `1.93`。
 - `MIN_PLUGIN_CORE_VERSION` 当前为 `2.0.0`，清单的 `min_core_version` 应满足此要求。
 - 插件自身的 `version` 独立维护，不需要与契约或主程序版本相同。
@@ -106,6 +106,14 @@ cargo check --locked
 cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
 ```
+
+## 错误协议
+
+能力调用使用 `CallResult<T>`：成功为 `{ "ok": true, "data": ... }`，失败为 `{ "ok": false, "error": PluginError }`。`PluginError` 的 `code` 是 `PluginErrorCode` 枚举，`message` 只用于展示。错误同时携带 `details`、`plugin_id`、`capability_id`、`operation`、`request_id` 和 `retryable`，不能把整个错误压成一个字符串。
+
+`message` 限 512 UTF-8 字节，身份字段各限 128 字节，`details` 限 4096 字节；使用 `PluginError::validate()` 校验。宿主按 `http_status()` 映射 REST 状态，并将协议错误码保留到 REST 的 `details.reason`。REST 的 `error/message/details/trace_id` 字段保持兼容，`message` 不参与业务判断。
+
+Web/Flutter 的插件页面桥接失败使用 REST 错误对象，额外携带可用的 HTTP `status`；页面通过桥接的 `createError` 辅助函数恢复异常属性，避免丢失错误码和追踪信息。它与插件业务入口返回的 `PluginError` 信封分别服务于页面请求与运行时调用。
 
 ## 许可证
 
