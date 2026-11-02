@@ -10,7 +10,7 @@ Ting Reader 的公开插件协议契约。主程序后端与插件 SDK 使用这
 | `capability` | 九类能力声明、固定操作及能力注册类型 |
 | `format` / `format_registry` | 扩展格式声明及通用匹配规则 |
 | `format_calls` | 格式调用、元数据提取、资源引用及 staging 写回数据 |
-| `scraper` | 元数据搜索请求、结果和校验规则 |
+| `scraper` | 元数据搜索、书源详情与章节、媒体描述和校验规则 |
 | `resources` | 资源句柄、资源操作及生命周期数据 |
 | `protocol` | 调用结果信封、错误结构和错误码 |
 | `native_abi` | Native 插件的 Rust ABI 声明，与 C 头文件对应 |
@@ -60,7 +60,7 @@ JavaScript 插件使用项目根目录的 `sdk.mjs`，按能力文档中的输�
 
 ```toml
 [dependencies]
-ting-plugin-contract = { git = "https://github.com/dqsq2e2/ting-reader-plugin-contract.git", tag = "v2.0.3" }
+    ting-plugin-contract = { git = "https://github.com/dqsq2e2/ting-reader-plugin-contract.git", tag = "v2.0.4" }
 serde_json = "1"
 ```
 
@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## 版本与构建
 
-- 当前 crate 版本为 `2.0.3`，发布 tag 为 `v2.0.3`。
+- 当前 crate 版本为 `2.0.4`，增加可选书源声明、完整书源详情和媒体请求头；对应发布 tag 为 `v2.0.4`。
 - 使用 Rust 2024 edition，最低 Rust 版本为 `1.93`。
 - `MIN_PLUGIN_CORE_VERSION` 当前为 `2.0.0`，清单的 `min_core_version` 应满足此要求。
 - 插件自身的 `version` 独立维护，不需要与契约或主程序版本相同。

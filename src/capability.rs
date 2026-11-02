@@ -88,6 +88,8 @@ pub struct MetadataProviderCap {
     pub id: String,
     pub operations: Vec<MetadataOperation>,
     #[serde(default)]
+    pub book_source: bool,
+    #[serde(default)]
     pub auto_scrape: bool,
     #[serde(default)]
     pub aggregate_auto_scrape: bool,
@@ -309,6 +311,14 @@ impl Capability {
                     cap.operations.contains(&MetadataOperation::Search),
                     "search is required",
                 )?;
+                if cap.book_source {
+                    require(
+                        [MetadataOperation::Detail, MetadataOperation::ResolveAudio]
+                            .iter()
+                            .all(|operation| cap.operations.contains(operation)),
+                        "book_source requires search, detail and resolve_audio",
+                    )?;
+                }
                 require(
                     !cap.search_fields.is_empty(),
                     "search_fields must not be empty",
@@ -733,6 +743,46 @@ fn validate_ui_entry(entry: &str) -> Result<(), InvalidCapability> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn book_sources_require_complete_playback_operations_but_old_scrapers_do_not() {
+        let old = json!({
+            "id":"metadata","kind":"metadata_provider","operations":["search"],
+            "search_fields":[{"key":"title","label":{"en":"Title"},"required":true,"type":"text"}],
+            "result_fields":[{"key":"title","label":{"en":"Title"}}]
+        });
+        let capability: Capability = serde_json::from_value(old.clone()).unwrap();
+        capability.validate().unwrap();
+        assert!(matches!(
+            capability,
+            Capability::MetadataProvider(MetadataProviderCap {
+                book_source: false,
+                ..
+            })
+        ));
+        for operations in [
+            json!(["search"]),
+            json!(["search", "detail"]),
+            json!(["search", "resolve_audio"]),
+        ] {
+            let mut source = old.clone();
+            source["book_source"] = json!(true);
+            source["operations"] = operations;
+            assert!(
+                serde_json::from_value::<Capability>(source)
+                    .unwrap()
+                    .validate()
+                    .is_err()
+            );
+        }
+        let mut source = old;
+        source["book_source"] = json!(true);
+        source["operations"] = json!(["search", "detail", "resolve_audio"]);
+        serde_json::from_value::<Capability>(source)
+            .unwrap()
+            .validate()
+            .unwrap();
+    }
 
     #[test]
     fn all_nine_capabilities_round_trip_with_declared_operations() {

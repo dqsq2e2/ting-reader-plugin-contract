@@ -3,6 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::{BTreeMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -233,6 +234,10 @@ where
     Option::<T>::deserialize(deserializer)
 }
 
+fn default_true() -> bool {
+    true
+}
+
 impl SourceRef {
     pub fn validate(&self) -> Result<(), &'static str> {
         if self.id.as_deref().is_some_and(|id| id.trim().is_empty())
@@ -310,6 +315,55 @@ impl ChapterItem {
     }
 }
 
+/// Only opted-in book sources return this shape from `detail`.
+/// Ordinary metadata providers continue to return `ScraperResult`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SourceBookDetail {
+    pub metadata: ScraperResult,
+    /// Whether `chapters` contains the complete source directory. A source
+    /// that exposes `list_chapters` may return only the first page here.
+    #[serde(default = "default_true")]
+    pub chapters_complete: bool,
+    pub chapters: Vec<ChapterItem>,
+}
+
+impl SourceBookDetail {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        self.metadata.validate()?;
+        if self
+            .metadata
+            .id
+            .as_deref()
+            .is_none_or(|id| id.trim().is_empty() || id.len() > 512)
+        {
+            return Err("Book source detail requires a stable ID within 512 bytes");
+        }
+        if self.chapters.len() > 20_000 {
+            return Err("Book source detail must not exceed 20000 chapters");
+        }
+        if self.chapters_complete && self.chapters.is_empty() {
+            return Err("Complete book source detail requires at least one chapter");
+        }
+        let mut ids = HashSet::new();
+        let mut indices = HashSet::new();
+        for chapter in &self.chapters {
+            chapter.validate()?;
+            if !ids.insert(&chapter.id) || !indices.insert(chapter.index) {
+                return Err("Book source chapters require unique IDs and indices");
+            }
+            if chapter.index > i32::MAX as u32
+                || chapter
+                    .duration
+                    .is_some_and(|duration| duration > i32::MAX as u64)
+            {
+                return Err("Book source chapter index or duration exceeds storage bounds");
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ChapterPage {
@@ -367,13 +421,15 @@ pub enum MediaSourceType {
     Proxy,
 }
 
-/// Credentials and origin headers stay in the Host, outside the plugin DTO.
+/// Origin headers are consumed by the Host proxy and never sent to clients.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MediaSourceDescriptor {
     #[serde(rename = "type")]
     pub source_type: MediaSourceType,
     pub url: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub headers: BTreeMap<String, String>,
     #[serde(deserialize_with = "required_nullable")]
     pub expires_at: Option<String>,
     pub seekable: bool,
@@ -390,8 +446,41 @@ impl MediaSourceDescriptor {
         {
             return Err("Media source must be an HTTP URL or a Host route");
         }
-        if self.mime.as_ref().is_some_and(|mime| mime.len() > 256) {
+        if self.mime.as_ref().is_some_and(|mime| {
+            mime.is_empty()
+                || mime.len() > 256
+                || !mime.bytes().all(|byte| (32..127).contains(&byte))
+        }) {
             return Err("Media MIME type exceeds bounds");
+        }
+        if self.headers.len() > 32
+            || self.headers.iter().any(|(name, value)| {
+                name.is_empty()
+                    || name.len() > 128
+                    || !name.bytes().all(|byte| {
+                        byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte)
+                    })
+                    || matches!(
+                        name.to_ascii_lowercase().as_str(),
+                        "host"
+                            | "connection"
+                            | "content-length"
+                            | "transfer-encoding"
+                            | "range"
+                            | "accept-encoding"
+                            | "proxy-authorization"
+                            | "proxy-connection"
+                            | "te"
+                            | "trailer"
+                            | "upgrade"
+                    )
+                    || value.len() > 8192
+                    || value
+                        .bytes()
+                        .any(|byte| byte < 32 && byte != b'\t' || byte == 127)
+            })
+        {
+            return Err("Media headers contain forbidden names, values or exceed bounds");
         }
         Ok(())
     }
@@ -430,6 +519,39 @@ impl CoverAssetRef {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn media_headers_are_optional_bounded_and_cannot_override_transport() {
+        let old = serde_json::json!({
+            "type":"direct","url":"https://media.example/test.mp3","expires_at":null,
+            "mime":"audio/mpeg","seekable":true
+        });
+        let descriptor: MediaSourceDescriptor = serde_json::from_value(old.clone()).unwrap();
+        assert!(descriptor.headers.is_empty());
+        for (name, value) in [
+            ("Host", "internal"),
+            ("range", "bytes=0-"),
+            ("Cookie", "value\r\nInjected: yes"),
+            ("Connection", "keep-alive"),
+            ("Accept-Encoding", "gzip"),
+        ] {
+            let mut source = old.clone();
+            source["headers"] = serde_json::json!({name: value});
+            assert!(
+                serde_json::from_value::<MediaSourceDescriptor>(source)
+                    .unwrap()
+                    .validate()
+                    .is_err()
+            );
+        }
+        let mut source = old;
+        source["headers"] =
+            serde_json::json!({"Referer":"https://source.example/", "User-Agent":"Example"});
+        serde_json::from_value::<MediaSourceDescriptor>(source)
+            .unwrap()
+            .validate()
+            .unwrap();
+    }
 
     #[test]
     fn search_output_requires_declared_null_fields() {
@@ -500,5 +622,32 @@ mod tests {
             .validate()
             .is_err()
         );
+    }
+
+    #[test]
+    fn source_detail_can_be_partial_only_when_explicitly_marked() {
+        let metadata = serde_json::json!({
+            "id": "book-1", "source_url": null, "title": "Book",
+            "author": null, "narrator": null, "cover_url": null, "intro": null,
+            "subtitle": null, "publisher": null, "language": null, "genre": null,
+            "published_year": null, "published_date": null, "isbn": null, "asin": null,
+            "explicit": null, "abridged": null, "tags": [], "duration": null,
+            "score": null, "chapter_title_template": null, "chapter_titles": []
+        });
+        let partial: SourceBookDetail = serde_json::from_value(serde_json::json!({
+            "metadata": metadata,
+            "chapters_complete": false,
+            "chapters": []
+        }))
+        .unwrap();
+        assert!(partial.validate().is_ok());
+
+        let complete: SourceBookDetail = serde_json::from_value(serde_json::json!({
+            "metadata": partial.metadata,
+            "chapters": []
+        }))
+        .unwrap();
+        assert!(complete.chapters_complete);
+        assert!(complete.validate().is_err());
     }
 }
